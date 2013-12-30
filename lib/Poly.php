@@ -43,16 +43,20 @@ class Poly {
 		}
 
 		$result = Poly_Router::match($url);
+		$error = false;
+
 		if ($result === false) {
-			self::error(404, 'No matching route for '.htmlentities($url));
+			Poly_Router::handleError($url, 'no-route', $url, 'No matching route for '.htmlentities($url));
 		}
+
+		$result['url'] = $url;
 
 		$action = $result['named']['action'];
 		$controller = $result['named']['controller'];
 		$package = $result['named']['package'];
 
 		if (empty($action) || $action{0} == '_') {
-			self::error(404, "Invalid action '$action'");
+			Poly_Router::handleError($url, 'invalid-action', $action, "Invalid action '$action'");
 		}
 
 		$class = 'Controller_'.ucfirst($controller);
@@ -61,15 +65,14 @@ class Poly {
 		}
 
 		$file = APP.str_replace('_', '/', $class) . '.php';
-
 		if (!file_exists($file)) {
-			self::error(404, "Missing controller file '$file'");
+			Poly_Router::handleError($url, 'missing-file', $file, "Missing controller file '$file'");
 		}
 
 		require_once ($file);
 
 		if (!class_exists($class)) {
-			self::error(404, "Missing controller class '$class'");
+			Poly_Router::handleError($url, 'missing-class', $class, "Missing controller class '$class'");
 		}
 
 		$controllerMethods = get_class_methods('Poly_Controller');
@@ -77,14 +80,17 @@ class Poly {
 		$validActions = array_diff($controllerActions, $controllerMethods);
 
 		if (!in_array($action, $validActions)) {
-			self::error(404, "Invalid action '$action' in '$class'");
+			Poly_Router::handleError($url, 'invalid-action', "$class::$action", "Invalid action '$action' in '$class'");
 		}
 
-		$Controller = new $class;
+		return self::dispatch($class, $action, $result, $return);
+	}
 
-		$args = $result['params'];
-		$Controller->params = $result;
-		$Controller->params['url'] = $url;
+	static function dispatch($class, $action, $params, $return = false) {
+		$args = $params['params'];
+
+		$Controller = new $class;
+		$Controller->params = $params;
 		$Controller->action = $action;
 		$Controller->beforeFilter();
 		$out = null;
@@ -112,6 +118,7 @@ class Poly {
 		if ($return) {
 			return $out !== null ? $out : $Controller->output;
 		}
+
 		echo $Controller->output;
 		echo $out;
 	}

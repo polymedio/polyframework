@@ -34,6 +34,11 @@ class Poly_Router {
 	public static $defaultRoute = array();
 
 	/**
+	 * Error handler
+	 */
+	public static $errorHandler = null;
+
+	/**
 	 * Conecta una ruta
 	 *
 	 * @param String $rule         Regla para decidir aplicar la ruta
@@ -143,5 +148,19 @@ class Poly_Router {
 		return $result;
 	}
 
+	public static function handleError($url, $error, $data = null, $message = null) {
+		if (!self::$errorHandler) {
+			Poly::error(404, $message);
+		}
+
+		$params = array('params' => array($error, $data, $message), 'named' => array(), 'url' => $url);
+		$params['named']['action'] = self::$errorHandler['action'];
+		$params['named']['controller'] = self::$errorHandler['controller'];
+		$params['named']['package'] = null;
+
+		$class = 'Controller_' . ucfirst(self::$errorHandler['controller']);
+
+		Poly::dispatch($class, self::$errorHandler['action'], $params);
+	}
 }
 
